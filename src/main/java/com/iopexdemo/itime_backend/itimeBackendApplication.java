@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class ItimeBackendApplication {
+public class itimeBackendApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ItimeBackendApplication.class, args);
+		SpringApplication.run(itimeBackendApplication.class, args);
 	}
 
 }
