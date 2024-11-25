@@ -33,11 +33,15 @@ public class PunchMapper {
     public TimeCalculationResponse toTimeCalculationResponse(
             Optional<WebPunch> lastPunchIn,
             Optional<WebPunch> lastPunchOut,
-            Duration totalHours) {
+            Duration totalHours,
+            Optional<WebPunch> lastPunch)
+
+    {
         return TimeCalculationResponse.builder()
                 .punchInTime(lastPunchIn.map(WebPunch::getPunchTime).orElse(null))
                 .punchOutTime(lastPunchOut.map(WebPunch::getPunchTime).orElse(null))
                 .totalWorkingHours(DateTimeUtil.formatDuration(totalHours))
+                .lastPunch(lastPunch.map(punch -> punch.getPunchType().toString()).orElse(null))
                 .build();
     }
 }

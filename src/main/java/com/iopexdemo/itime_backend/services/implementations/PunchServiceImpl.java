@@ -4,19 +4,19 @@ import com.iopexdemo.itime_backend.dto.PunchRequest;
 import com.iopexdemo.itime_backend.dto.TimeCalculationResponse;
 import com.iopexdemo.itime_backend.entities.WebPunch;
 import com.iopexdemo.itime_backend.enums.EnumPunchType;
-import com.iopexdemo.itime_backend.enums.EnumStatus;
 import com.iopexdemo.itime_backend.mapper.PunchMapper;
 import com.iopexdemo.itime_backend.repositories.EmployeeRepository;
 import com.iopexdemo.itime_backend.repositories.WebPunchRepository;
 import com.iopexdemo.itime_backend.services.PunchService;
 import com.iopexdemo.itime_backend.validators.PunchValidator;
+import com.iopexdemo.itime_backend.dto.TimeCalculationValidationResult;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,34 +43,38 @@ public class PunchServiceImpl implements PunchService {
         webPunchRepository.save(punch);
     }
 
+    @Override
     public TimeCalculationResponse calculateTime(Integer employeeId) {
-        LocalDateTime today = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
+        // Get the current date automatically
+        LocalDate currentDate = LocalDate.now();
 
-        logger.info("Punch data of the day is retrieved and calculated.");
-        // Fetch all punches for the employee for the current day
-        List<WebPunch> punches = webPunchRepository
-                .findByEmployeeIdAndStatusAndPunchTimeBetweenOrderByPunchTimeAsc(
-                        employeeId, EnumStatus.ACTIVE, today, today.plusDays(1));
+        // Validate the punches for the given employee and date
+        TimeCalculationValidationResult validationResult = punchValidator.validateTimeCalculation(employeeId, currentDate);
+        List<WebPunch> punches = validationResult.getValidPunches();
 
-        // Get the first punch-in of the day
+        // Find the first "IN" punch and the last "OUT" punch
         Optional<WebPunch> firstPunchIn = punches.stream()
                 .filter(p -> EnumPunchType.IN.equals(p.getPunchType()))
-                .findFirst(); // Use findFirst to get the earliest punch-in
+                .findFirst();
 
-        // Get the last punch-out of the day
+        Optional<WebPunch> lastPunch = punches.stream()
+                .reduce((first, second) -> second);
+
         Optional<WebPunch> lastPunchOut = punches.stream()
                 .filter(p -> EnumPunchType.OUT.equals(p.getPunchType()))
                 .reduce((first, second) -> second);
 
-        // Calculate the total working hours
+        // Calculate the total hours worked between the first IN punch and last OUT punch
         Duration totalHours = Duration.ZERO;
         if (firstPunchIn.isPresent() && lastPunchOut.isPresent()) {
             totalHours = Duration.between(firstPunchIn.get().getPunchTime(), lastPunchOut.get().getPunchTime());
         }
 
-        logger.info("Response data is generated using mapper class.");
-        // Use the mapper to generate the response
-        return punchMapper.toTimeCalculationResponse(firstPunchIn, lastPunchOut, totalHours);
+        // Return the time calculation response
+        return punchMapper.toTimeCalculationResponse(firstPunchIn, lastPunchOut, totalHours, lastPunch);
     }
 
 }
+
+
+

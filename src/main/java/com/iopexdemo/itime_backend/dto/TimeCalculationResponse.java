@@ -11,5 +11,6 @@ public class TimeCalculationResponse {
     private LocalDateTime punchInTime;
     private LocalDateTime punchOutTime;
     private String totalWorkingHours;
+    private String lastPunch;
 }
 

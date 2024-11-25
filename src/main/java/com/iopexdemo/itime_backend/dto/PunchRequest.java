@@ -4,6 +4,8 @@ import com.iopexdemo.itime_backend.enums.EnumPunchType;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 public class PunchRequest {
