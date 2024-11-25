@@ -3,6 +3,7 @@ package com.iopexdemo.itime_backend.mapper;
 import com.iopexdemo.itime_backend.dto.PunchRequest;
 import com.iopexdemo.itime_backend.dto.TimeCalculationResponse;
 import com.iopexdemo.itime_backend.entities.EmployeeDetails;
+import com.iopexdemo.itime_backend.entities.ShiftDetails;
 import com.iopexdemo.itime_backend.entities.WebPunch;
 import com.iopexdemo.itime_backend.enums.EnumPunchType;
 import com.iopexdemo.itime_backend.enums.EnumStatus;
@@ -34,7 +35,8 @@ public class PunchMapper {
             Optional<WebPunch> lastPunchIn,
             Optional<WebPunch> lastPunchOut,
             Duration totalHours,
-            Optional<WebPunch> lastPunch)
+            Optional<WebPunch> lastPunch,
+            ShiftDetails shiftDetails)
 
     {
         return TimeCalculationResponse.builder()
@@ -42,6 +44,8 @@ public class PunchMapper {
                 .punchOutTime(lastPunchOut.map(WebPunch::getPunchTime).orElse(null))
                 .totalWorkingHours(DateTimeUtil.formatDuration(totalHours))
                 .lastPunch(lastPunch.map(punch -> punch.getPunchType().toString()).orElse(null))
+                .shiftStartTime(shiftDetails.getStartTime())
+                .shiftEndTime(shiftDetails.getEndTime())
                 .build();
     }
 }
