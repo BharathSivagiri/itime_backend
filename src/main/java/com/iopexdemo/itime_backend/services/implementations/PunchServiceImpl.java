@@ -48,15 +48,15 @@ public class PunchServiceImpl implements PunchService {
     }
 
     @Override
-    public TimeCalculationResponse calculateTime(Integer employeeId) {
-        LocalDate currentDate = LocalDate.now();
+    public TimeCalculationResponse calculateTime(Integer employeeId, LocalDate date) {
+        LocalDate targetDate = date != null ? date : LocalDate.now();
 
         // Get employee's shift details
         ShiftRosterDetails rosterDetails = shiftRosterDetailsRepository
-            .findByEmployeeIdAndShiftDate(employeeId, currentDate);
+                .findByEmployeeIdAndShiftDate(employeeId, targetDate);
         ShiftDetails shiftDetails = rosterDetails.getShiftDetails();
 
-        TimeCalculationValidationResult validationResult = punchValidator.validateTimeCalculation(employeeId, currentDate);
+        TimeCalculationValidationResult validationResult = punchValidator.validateTimeCalculation(employeeId, targetDate);
         List<WebPunch> punches = validationResult.getValidPunches();
 
         Optional<WebPunch> firstPunchIn = punches.stream()
