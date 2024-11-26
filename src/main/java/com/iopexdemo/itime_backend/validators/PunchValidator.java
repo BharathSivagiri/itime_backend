@@ -52,19 +52,19 @@ public class PunchValidator {
                         punchDate,
                         EnumRecordStatus.ACTIVE
                 )
-                .orElseThrow(() -> new CustomException("No shift assigned for this date"));
+                .orElseThrow(() -> new CustomException(AppMessages.SHIFT_NOT_ASSIGNED));
 
         // Check if the shift crosses midnight (start time > end time)
         if (roster.getShiftDetails().getStartTime().isAfter(roster.getShiftDetails().getEndTime())) {
             if (currentTime.isBefore(roster.getShiftDetails().getStartTime()) &&
                     currentTime.isAfter(roster.getShiftDetails().getEndTime())) {
-                throw new CustomException("Current time is outside assigned shift hours");
+                throw new CustomException(AppMessages.TIME_OUTSIDE_SHIFT);
             }
         } else {
             // Regular shift within the same day
             if (currentTime.isBefore(roster.getShiftDetails().getStartTime()) ||
                     currentTime.isAfter(roster.getShiftDetails().getEndTime())) {
-                throw new CustomException("Current time is outside assigned shift hours");
+                throw new CustomException(AppMessages.TIME_OUTSIDE_SHIFT);
             }
         }
     }
@@ -76,7 +76,7 @@ public class PunchValidator {
                         punchDate,
                         EnumRecordStatus.ACTIVE
                 )
-                .orElseThrow(() -> new CustomException("No shift assigned for this date"));
+                .orElseThrow(() -> new CustomException(AppMessages.SHIFT_NOT_ASSIGNED));
 
         LocalDateTime startOfDay = punchDate.atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
@@ -104,7 +104,7 @@ public class PunchValidator {
             long totalPunchCount = punchCountBeforeMidnight + punchCountAfterMidnight;
 
             if (totalPunchCount >= dailyPunchLimit) {
-                throw new CustomException("Daily punch limit exceeded");
+                throw new CustomException(AppMessages.PUNCH_LIMIT_EXCEEDED);
             }
 
         } else {
@@ -115,7 +115,7 @@ public class PunchValidator {
             );
 
             if (punchCount >= dailyPunchLimit) {
-                throw new CustomException("Daily punch limit exceeded");
+                throw new CustomException(AppMessages.PUNCH_LIMIT_EXCEEDED);
             }
         }
     }
@@ -132,7 +132,7 @@ public class PunchValidator {
                         currentDate,
                         EnumRecordStatus.ACTIVE
                 )
-                .orElseThrow(() -> new CustomException("No shift assigned for today"));
+                .orElseThrow(() -> new CustomException(AppMessages.SHIFT_NOT_ASSIGNED_TODAY));
 
         List<WebPunch> punches = webPunchRepository
                 .findByEmployeeIdAndStatusAndPunchTimeBetweenOrderByPunchTimeAsc(
