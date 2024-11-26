@@ -17,6 +17,6 @@ public class GlobalExceptionHandler {
         Map<String, String> response = new HashMap<>();
         response.put("error", ex.getMessage());
         response.put("status", "FAILED");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response.toString());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response.toString());
     }
 }
