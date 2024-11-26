@@ -12,6 +12,14 @@ import java.util.List;
 public interface WebPunchRepository extends JpaRepository<WebPunch, Integer> {
 
     List<WebPunch> findByEmployeeIdAndStatusAndPunchTimeBetweenOrderByPunchTimeAsc(
-            Integer employeeId, EnumStatus status, LocalDateTime startTime, LocalDateTime endTime);
-}
+            Integer employeeId,
+            EnumStatus status,
+            LocalDateTime startTime,
+            LocalDateTime endTime);
 
+    long countByEmployeeIdAndPunchTimeBetween(
+            Integer employeeId,
+            LocalDateTime startTime,
+            LocalDateTime endTime
+    );
+}
