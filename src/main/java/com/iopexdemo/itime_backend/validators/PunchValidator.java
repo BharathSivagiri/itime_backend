@@ -1,13 +1,12 @@
 package com.iopexdemo.itime_backend.validators;
 
-import com.iopexdemo.itime_backend.dto.PunchRequest;
-import com.iopexdemo.itime_backend.dto.TimeCalculationValidationResult;
 import com.iopexdemo.itime_backend.entities.EmployeeDetails;
+import com.iopexdemo.itime_backend.entities.ShiftDetails;
 import com.iopexdemo.itime_backend.entities.ShiftRosterDetails;
 import com.iopexdemo.itime_backend.entities.WebPunch;
 import com.iopexdemo.itime_backend.enums.EnumEmployeeStatus;
+import com.iopexdemo.itime_backend.enums.EnumPunchType;
 import com.iopexdemo.itime_backend.enums.EnumRecordStatus;
-import com.iopexdemo.itime_backend.enums.EnumStatus;
 import com.iopexdemo.itime_backend.exceptions.custom.CustomException;
 import com.iopexdemo.itime_backend.repositories.EmployeeRepository;
 import com.iopexdemo.itime_backend.repositories.ShiftRosterRepository;
@@ -16,9 +15,8 @@ import com.iopexdemo.itime_backend.utilities.constants.AppMessages;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import java.time.LocalDate;
+
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 
 @Component
@@ -30,133 +28,61 @@ public class PunchValidator {
     @Value("${punch.limit.daily}")
     private Integer dailyPunchLimit;
 
-    public void validatePunchRequest(PunchRequest request, EmployeeDetails employee) {
-        if (employee == null) {
-            throw new CustomException(AppMessages.EMPLOYEE_NOT_FOUND);
-        }
-        if (!EnumEmployeeStatus.ACTIVE.equals(employee.getEmpStatus())) {
-            throw new CustomException(AppMessages.EMPLOYEE_RECORD_NOT_FOUND);
-        }
-
-        LocalDate punchDate = LocalDate.now();
-        validateShiftTiming(request, punchDate);
-        validateDailyPunchLimit(request, punchDate);
-    }
-
-    private void validateShiftTiming(PunchRequest request, LocalDate punchDate) {
-        LocalTime currentTime = LocalTime.now();
-
-        ShiftRosterDetails roster = shiftRosterRepository
-                .findByEmployeeIdAndShiftDateAndRecordStatus(
-                        request.getEmployeeId(),
-                        punchDate,
-                        EnumRecordStatus.ACTIVE
-                )
-                .orElseThrow(() -> new CustomException(AppMessages.SHIFT_NOT_ASSIGNED));
-
-        // Check if the shift crosses midnight (start time > end time)
-        if (roster.getShiftDetails().getStartTime().isAfter(roster.getShiftDetails().getEndTime())) {
-            if (currentTime.isBefore(roster.getShiftDetails().getStartTime()) &&
-                    currentTime.isAfter(roster.getShiftDetails().getEndTime())) {
-                throw new CustomException(AppMessages.TIME_OUTSIDE_SHIFT);
-            }
-        } else {
-            // Regular shift within the same day
-            if (currentTime.isBefore(roster.getShiftDetails().getStartTime()) ||
-                    currentTime.isAfter(roster.getShiftDetails().getEndTime())) {
-                throw new CustomException(AppMessages.TIME_OUTSIDE_SHIFT);
-            }
-        }
-    }
-
-    private void validateDailyPunchLimit(PunchRequest request, LocalDate punchDate) {
-        ShiftRosterDetails roster = shiftRosterRepository
-                .findByEmployeeIdAndShiftDateAndRecordStatus(
-                        request.getEmployeeId(),
-                        punchDate,
-                        EnumRecordStatus.ACTIVE
-                )
-                .orElseThrow(() -> new CustomException(AppMessages.SHIFT_NOT_ASSIGNED));
-
-        LocalDateTime startOfDay = punchDate.atStartOfDay();
-        LocalDateTime endOfDay = startOfDay.plusDays(1);
-
-        if (roster.getShiftDetails().getStartTime().isAfter(roster.getShiftDetails().getEndTime())) {
-
-            LocalDateTime startOfShift = punchDate.atTime(roster.getShiftDetails().getStartTime());
-            LocalDateTime midnight = punchDate.atTime(23, 59, 59);
-
-            long punchCountBeforeMidnight = webPunchRepository.countByEmployeeIdAndPunchTimeBetween(
-                    request.getEmployeeId(),
-                    startOfShift,
-                    midnight
-            );
-
-            LocalDateTime nextDayStart = punchDate.plusDays(1).atStartOfDay();
-            LocalDateTime endOfShift = punchDate.plusDays(1).atTime(roster.getShiftDetails().getEndTime());
-
-            long punchCountAfterMidnight = webPunchRepository.countByEmployeeIdAndPunchTimeBetween(
-                    request.getEmployeeId(),
-                    nextDayStart,
-                    endOfShift
-            );
-
-            long totalPunchCount = punchCountBeforeMidnight + punchCountAfterMidnight;
-
-            if (totalPunchCount >= dailyPunchLimit) {
-                throw new CustomException(AppMessages.PUNCH_LIMIT_EXCEEDED);
-            }
-
-        } else {
-            long punchCount = webPunchRepository.countByEmployeeIdAndPunchTimeBetween(
-                    request.getEmployeeId(),
-                    startOfDay,
-                    endOfDay
-            );
-
-            if (punchCount >= dailyPunchLimit) {
-                throw new CustomException(AppMessages.PUNCH_LIMIT_EXCEEDED);
-            }
-        }
-    }
-
     public EmployeeDetails getValidatedEmployee(Integer employeeId, EmployeeRepository employeeRepository) {
         return employeeRepository.findByIdAndEmpStatus(employeeId, EnumEmployeeStatus.ACTIVE)
                 .orElseThrow(() -> new CustomException(AppMessages.EMPLOYEE_NOT_FOUND));
     }
 
-    public TimeCalculationValidationResult validateTimeCalculation(Integer employeeId, LocalDate currentDate) {
-        ShiftRosterDetails todayShift = shiftRosterRepository
+    public void validateShiftAndPunchLimit(Integer employeeId, EnumPunchType punchType) {
+        LocalDateTime currentTime = LocalDateTime.now();
+
+        // Get current shift roster
+        ShiftRosterDetails roster = shiftRosterRepository
                 .findByEmployeeIdAndShiftDateAndRecordStatus(
                         employeeId,
-                        currentDate,
+                        currentTime.toLocalDate(),
                         EnumRecordStatus.ACTIVE
-                )
-                .orElseThrow(() -> new CustomException(AppMessages.SHIFT_NOT_ASSIGNED_TODAY));
+                ).orElse(null);
 
-        List<WebPunch> punches = webPunchRepository
-                .findByEmployeeIdAndStatusAndPunchTimeBetweenOrderByPunchTimeAsc(
-                        employeeId,
-                        EnumStatus.ACTIVE,
-                        currentDate.atStartOfDay(),  // Start of the day
-                        currentDate.plusDays(1).atStartOfDay()  // Start of the next day
-                )
-                .stream()
-                .filter(punch -> isWithinShiftHours(punch, todayShift))  // Filter punches within shift hours
-                .toList();
+        // Check previous day for night shifts
+        if (roster == null) {
+            roster = shiftRosterRepository
+                    .findByEmployeeIdAndShiftDateAndRecordStatus(
+                            employeeId,
+                            currentTime.toLocalDate().minusDays(1),
+                            EnumRecordStatus.ACTIVE
+                    ).orElseThrow(() -> new CustomException(AppMessages.SHIFT_NOT_ASSIGNED));
+        }
 
-        return new TimeCalculationValidationResult(punches, todayShift);
-    }
+        ShiftDetails shift = roster.getShiftDetails();
+        LocalDateTime shiftStart;
+        LocalDateTime shiftEnd;
 
-    private boolean isWithinShiftHours(WebPunch punch, ShiftRosterDetails shift) {
-        LocalTime punchTime = punch.getPunchTime().toLocalTime();
-
-        if (shift.getShiftDetails().getStartTime().isAfter(shift.getShiftDetails().getEndTime())) {
-            return (punchTime.isAfter(shift.getShiftDetails().getStartTime()) || punchTime.isBefore(shift.getShiftDetails().getEndTime()));
+        if (shift.getStartTime().isBefore(shift.getEndTime())) {
+            // Day shift
+            shiftStart = roster.getShiftDate().atTime(shift.getStartTime());
+            shiftEnd = roster.getShiftDate().atTime(shift.getEndTime());
         } else {
-            return !punchTime.isBefore(shift.getShiftDetails().getStartTime()) &&
-                    !punchTime.isAfter(shift.getShiftDetails().getEndTime());
+            // Night shift
+            shiftStart = roster.getShiftDate().atTime(shift.getStartTime());
+            shiftEnd = roster.getShiftDate().plusDays(1).atTime(shift.getEndTime());
+        }
+
+        // Validate if current time is within shift hours
+        if (currentTime.isBefore(shiftStart) || currentTime.isAfter(shiftEnd)) {
+            throw new CustomException(AppMessages.TIME_OUTSIDE_SHIFT);
+        }
+
+        // Punch limit validation
+        List<WebPunch> shiftPunches = webPunchRepository
+                .findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(
+                        employeeId, shiftStart, shiftEnd);
+
+        if (shiftPunches.size() >= dailyPunchLimit) {
+            throw new CustomException(AppMessages.PUNCH_LIMIT_EXCEEDED);
         }
     }
 
 }
+
+

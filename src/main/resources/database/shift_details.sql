@@ -16,3 +16,5 @@ VALUES
 ('Shift 01', 'NIGHT', '22:00', '08:00', '2024-11-24', 'Admin', 'ACTIVE', '2024-11-24', 'Admin');
 
 SELECT * FROM shift_details;
+
+SELECT * FROM shift_details WHERE id IN (SELECT id FROM shift_roster_details WHERE emp_id = 1);

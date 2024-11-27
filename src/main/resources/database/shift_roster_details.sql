@@ -14,7 +14,10 @@ CREATE TABLE shift_roster_details (
 );
 
 INSERT INTO shift_roster_details (emp_id, shift_id, shift_date, shift_status, created_dt, created_by, record_status, updated_dt, updated_by) 
-VALUES (1, 1, '2024-11-25', 'SCHEDULED', '2024-11-24', 'Admin', 'ACTIVE', '2024-11-24', 'Admin');
+VALUES (1, 3, '2024-11-27', 'SCHEDULED', '2024-11-27', 'Admin', 'ACTIVE', '2024-11-27', 'Admin');
 
 SELECT * FROM shift_roster_details;
+
+-- SELECT * FROM shift_roster_details WHERE emp_id = 1 ORDER BY shift_date DESC LIMIT 2;
+
 

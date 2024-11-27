@@ -12,3 +12,5 @@ CREATE TABLE web_punch (
 );
 
 SELECT * FROM web_punch;
+
+SELECT * FROM web_punch WHERE punch_time BETWEEN '2024-11-26 00:00:00' AND '2024-11-27 23:59:59';

@@ -2,6 +2,7 @@ package com.iopexdemo.itime_backend.controllers;
 
 import com.iopexdemo.itime_backend.dto.PunchRequest;
 import com.iopexdemo.itime_backend.dto.TimeCalculationResponse;
+import com.iopexdemo.itime_backend.dto.WeeklyStatsResponse;
 import com.iopexdemo.itime_backend.services.implementations.PunchServiceImpl;
 import com.iopexdemo.itime_backend.utilities.constants.AppMessages;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/punch")
@@ -34,11 +36,20 @@ public class PunchController {
     @GetMapping("/calculate/{employeeId}")
     public ResponseEntity<TimeCalculationResponse> calculateTime(
             @PathVariable Integer employeeId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime targetDateTime) {
         logger.info("Time calculation for web punch data started.");
-        TimeCalculationResponse timeResponse = punchService.calculateTime(employeeId, date);
+        TimeCalculationResponse timeResponse = punchService.calculateTime(employeeId, targetDateTime);
         logger.info("Time calculation completed.");
         return ResponseEntity.ok(timeResponse);
     }
+
+//    @GetMapping("/weekly-stats")
+//    public ResponseEntity<WeeklyStatsResponse> getWeeklyStats(
+//            @RequestParam Integer employeeId,
+//            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+//            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+//        WeeklyStatsResponse stats = punchService.calculateWeeklyStats(employeeId, startDate, endDate);
+//        return ResponseEntity.ok(stats);
+//    }
 }
 
