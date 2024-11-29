@@ -9,7 +9,7 @@ import com.iopexdemo.itime_backend.enums.EnumPunchType;
 import com.iopexdemo.itime_backend.enums.EnumRecordStatus;
 import com.iopexdemo.itime_backend.exceptions.custom.CustomException;
 import com.iopexdemo.itime_backend.repositories.EmployeeRepository;
-import com.iopexdemo.itime_backend.repositories.ShiftRosterRepository;
+import com.iopexdemo.itime_backend.repositories.ShiftRosterDetailsRepository;
 import com.iopexdemo.itime_backend.repositories.WebPunchRepository;
 import com.iopexdemo.itime_backend.utilities.constants.AppMessages;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class PunchValidator {
-    private final ShiftRosterRepository shiftRosterRepository;
+    private final ShiftRosterDetailsRepository shiftRosterRepository;
     private final WebPunchRepository webPunchRepository;
 
     @Value("${punch.limit.daily}")

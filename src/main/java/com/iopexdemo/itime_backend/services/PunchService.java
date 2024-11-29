@@ -4,6 +4,7 @@ import com.iopexdemo.itime_backend.dto.PunchRequest;
 import com.iopexdemo.itime_backend.dto.TimeCalculationResponse;
 import com.iopexdemo.itime_backend.dto.WeeklyStatsResponse;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public interface PunchService {
@@ -12,5 +13,5 @@ public interface PunchService {
 
     TimeCalculationResponse calculateTime(Integer employeeId, LocalDateTime date);
 
-//    WeeklyStatsResponse calculateWeeklyStats(Integer employeeId, LocalDate startDate, LocalDate endDate);
+    WeeklyStatsResponse calculateWeeklyStats(Integer employeeId, LocalDate startDate, LocalDate endDate);
 }

@@ -3,7 +3,6 @@ package com.iopexdemo.itime_backend.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
-import java.time.Duration;
 import java.time.LocalDate;
 
 @Data
@@ -11,6 +10,6 @@ import java.time.LocalDate;
 public class WeeklyStatsResponse {
     private LocalDate weekStartDate;
     private LocalDate weekEndDate;
-    private Duration totalShiftHours;
-    private Duration totalActualHours;
+    private String totalShiftHours;
+    private String totalActualHours;
 }

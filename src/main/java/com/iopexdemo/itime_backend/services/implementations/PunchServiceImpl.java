@@ -5,6 +5,7 @@ import com.iopexdemo.itime_backend.entities.ShiftDetails;
 import com.iopexdemo.itime_backend.entities.ShiftRosterDetails;
 import com.iopexdemo.itime_backend.entities.WebPunch;
 import com.iopexdemo.itime_backend.enums.EnumPunchType;
+import com.iopexdemo.itime_backend.enums.EnumRecordStatus;
 import com.iopexdemo.itime_backend.mapper.PunchMapper;
 import com.iopexdemo.itime_backend.repositories.EmployeeRepository;
 import com.iopexdemo.itime_backend.repositories.ShiftRosterDetailsRepository;
@@ -19,7 +20,6 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,112 +45,138 @@ public class PunchServiceImpl implements PunchService {
         logger.info("Data saved in database after mapped using mapper class.");
         webPunchRepository.save(punch);
     }
+
     @Override
     public TimeCalculationResponse calculateTime(Integer employeeId, LocalDateTime targetDateTime) {
+        // Set target time - use provided time or current time if null
         LocalDateTime currentDateTime = targetDateTime != null ? targetDateTime : LocalDateTime.now();
+        LocalDate currentDate = currentDateTime.toLocalDate();
 
-        // Get the roster for current date
-        ShiftRosterDetails rosterDetails = shiftRosterDetailsRepository
-                .findByEmployeeIdAndShiftDate(employeeId, currentDateTime.toLocalDate());
+        // Fetch current day's shift roster from database
+        ShiftRosterDetails currentRoster = shiftRosterDetailsRepository
+                .findByEmployeeIdAndShiftDateAndRecordStatus(employeeId, currentDate, EnumRecordStatus.ACTIVE)
+                .orElse(null);
 
-        if (rosterDetails == null) {
+        // Fetch previous day's shift roster from database
+        ShiftRosterDetails previousRoster = shiftRosterDetailsRepository
+                .findByEmployeeIdAndShiftDateAndRecordStatus(employeeId, currentDate.minusDays(1), EnumRecordStatus.ACTIVE)
+                .orElse(null);
+
+        // Calculate current shift start time (ex 18:00 current day)
+        LocalDateTime currentShiftStart = currentRoster != null ?
+                currentRoster.getShiftDate().atTime(currentRoster.getShiftDetails().getStartTime()) : null;
+
+        // Calculate current shift end time (ex 07:00 next day)
+        LocalDateTime currentShiftEnd = currentRoster != null ?
+                currentRoster.getShiftDate().plusDays(1).atTime(currentRoster.getShiftDetails().getEndTime()) : null;
+
+        // Calculate previous shift end time (ex 07:00 current day)
+        LocalDateTime previousShiftEnd = previousRoster != null ?
+                previousRoster.getShiftDate().plusDays(1).atTime(previousRoster.getShiftDetails().getEndTime()) : null;
+
+        // Determine which roster is active based on target time
+        // If time is before previous shift end -> use previous roster
+        // If time is after current shift start -> use current roster
+        // Otherwise return null (time falls between shifts)
+        ShiftRosterDetails activeRoster = previousShiftEnd != null && currentDateTime.isBefore(previousShiftEnd) ?
+                previousRoster : (currentShiftStart != null && !currentDateTime.isBefore(currentShiftStart) ? currentRoster : null);
+
+        // Return empty response if no active roster found (time between shifts)
+        if (activeRoster == null) {
             return TimeCalculationResponse.builder().build();
         }
 
-        ShiftDetails shiftDetails = rosterDetails.getShiftDetails();
-        LocalDate shiftDate = rosterDetails.getShiftDate();
+        // Get shift details and calculate query window
+        ShiftDetails shift = activeRoster.getShiftDetails();
+        LocalDateTime queryStart = activeRoster.getShiftDate().atTime(shift.getStartTime());
+        LocalDateTime queryEnd = activeRoster.getShiftDate().plusDays(1).atTime(shift.getEndTime());
 
-        // Calculate query window based on shift type
-        LocalDateTime queryStart;
-        LocalDateTime queryEnd;
+        // Get all punches within shift window, ordered by time
+        List<WebPunch> punches = webPunchRepository
+                .findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(employeeId, queryStart, queryEnd);
 
-        if (shiftDetails.getStartTime().isBefore(shiftDetails.getEndTime())) {
-            // Day shift
-            queryStart = LocalDateTime.of(shiftDate, shiftDetails.getStartTime());
-            queryEnd = LocalDateTime.of(shiftDate, shiftDetails.getEndTime());
-        } else {
-            // Night shift
-            queryStart = LocalDateTime.of(shiftDate, shiftDetails.getStartTime());
-            queryEnd = LocalDateTime.of(shiftDate.plusDays(1), shiftDetails.getEndTime());
+        // Validate punch sequence - first punch must be IN
+        Optional<WebPunch> firstPunch = punches.stream().findFirst();
+        if (firstPunch.isPresent() && !EnumPunchType.IN.equals(firstPunch.get().getPunchType())) {
+            return TimeCalculationResponse.builder().build();
         }
 
-        List<WebPunch> punches = webPunchRepository
-                .findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(
-                        employeeId, queryStart, queryEnd);
-
+        // Get first IN punch of shift
         Optional<WebPunch> firstPunchIn = punches.stream()
                 .filter(p -> EnumPunchType.IN.equals(p.getPunchType()))
                 .findFirst();
 
+        // Get last OUT punch of shift
         Optional<WebPunch> lastPunchOut = punches.stream()
                 .filter(p -> EnumPunchType.OUT.equals(p.getPunchType()))
                 .reduce((first, second) -> second);
 
-        Optional<WebPunch> lastPunch = punches.stream()
-                .reduce((first, second) -> second);
+        // Calculate total hours if both IN and OUT punches exist
+        Duration totalHours = (firstPunchIn.isPresent() && lastPunchOut.isPresent()) ?
+                Duration.between(firstPunchIn.get().getPunchTime(), lastPunchOut.get().getPunchTime()) : Duration.ZERO;
 
-        Duration totalHours = Duration.ZERO;
-        if (firstPunchIn.isPresent() && lastPunchOut.isPresent()) {
-            totalHours = Duration.between(firstPunchIn.get().getPunchTime(), lastPunchOut.get().getPunchTime());
-        }
-
-        return punchMapper.toTimeCalculationResponse(firstPunchIn, lastPunchOut, totalHours, lastPunch, shiftDetails);
+        // Map all calculated data to response object
+        return punchMapper.toTimeCalculationResponse(
+                firstPunchIn,
+                lastPunchOut,
+                totalHours,
+                punches.stream().reduce((first, second) -> second),
+                shift);
     }
 
-//    public WeeklyStatsResponse calculateWeeklyStats(Integer employeeId, LocalDate startDate, LocalDate endDate) {
-//        Duration totalActualHours = Duration.ZERO;
-//        Duration totalShiftHours = Duration.ZERO;
-//        LocalDate currentDate = startDate;
-//
-//        while (!currentDate.isAfter(endDate)) {
-//            ShiftRosterDetails rosterDetails = shiftRosterDetailsRepository
-//                    .findByEmployeeIdAndShiftDate(employeeId, currentDate);
-//
-//            if (rosterDetails != null) {
-//                ShiftDetails shiftDetails = rosterDetails.getShiftDetails();
-//
-//                // Calculate shift hours
-//                Duration shiftHours = Duration.between(
-//                        shiftDetails.getStartTime(),
-//                        shiftDetails.getStartTime().isAfter(shiftDetails.getEndTime()) ?
-//                                shiftDetails.getEndTime().plusHours(24) :
-//                                shiftDetails.getEndTime()
-//                );
-//                totalShiftHours = totalShiftHours.plus(shiftHours);
-//
-//                // Get punch data
-//                List<WebPunch> currentDayPunches = webPunchRepository.findByEmployeeIdAndPunchDateBetween(
-//                        employeeId,
-//                        currentDate,
-//                        shiftDetails.getStartTime().isAfter(shiftDetails.getEndTime()) ?
-//                                currentDate.plusDays(1) : currentDate
-//                );
-//
-//                // Calculate actual hours from punches
-//                if (!currentDayPunches.isEmpty()) {
-//                    Optional<WebPunch> firstPunchIn = currentDayPunches.stream()
-//                            .filter(p -> EnumPunchType.IN.equals(p.getPunchType()))
-//                            .findFirst();
-//
-//                    Optional<WebPunch> lastPunchOut = currentDayPunches.stream()
-//                            .filter(p -> EnumPunchType.OUT.equals(p.getPunchType()))
-//                            .reduce((first, second) -> second);
-//
-//                    if (firstPunchIn.isPresent() && lastPunchOut.isPresent()) {
-//                        Duration actualHours = Duration.between(
-//                                firstPunchIn.get().getPunchTime(),
-//                                lastPunchOut.get().getPunchTime()
-//                        );
-//                        totalActualHours = totalActualHours.plus(actualHours);
-//                    }
-//                }
-//            }
-//            currentDate = currentDate.plusDays(1);
-//        }
-//
-//        return new WeeklyStatsResponse(startDate, endDate, totalShiftHours, totalActualHours);
-//    }
+    @Override
+    public WeeklyStatsResponse calculateWeeklyStats(Integer employeeId, LocalDate startDate, LocalDate endDate) {
+        Duration totalActualHours = Duration.ZERO;
+        Duration totalShiftHours = Duration.ZERO;
+        LocalDate currentDate = startDate;
 
+        while (!currentDate.isAfter(endDate)) {
+            ShiftRosterDetails currentRoster = shiftRosterDetailsRepository
+                    .findByEmployeeIdAndShiftDateAndRecordStatus(employeeId, currentDate, EnumRecordStatus.ACTIVE)
+                    .orElse(null);
+
+            if (currentRoster != null) {
+                ShiftDetails shift = currentRoster.getShiftDetails();
+
+                LocalDateTime queryStart = currentRoster.getShiftDate().atTime(shift.getStartTime());
+                LocalDateTime queryEnd = currentRoster.getShiftDate().plusDays(1).atTime(shift.getEndTime());
+
+                Duration shiftHours = Duration.between(queryStart, queryEnd);
+                totalShiftHours = totalShiftHours.plus(shiftHours);
+
+                List<WebPunch> punches = webPunchRepository
+                        .findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(
+                                employeeId, queryStart, queryEnd);
+
+                Optional<WebPunch> firstPunchIn = punches.stream()
+                        .filter(p -> EnumPunchType.IN.equals(p.getPunchType()))
+                        .findFirst();
+
+                Optional<WebPunch> lastPunchOut = punches.stream()
+                        .filter(p -> EnumPunchType.OUT.equals(p.getPunchType()))
+                        .reduce((first, second) -> second);
+
+                if (firstPunchIn.isPresent() && lastPunchOut.isPresent()) {
+                    Duration actualHours = Duration.between(
+                            firstPunchIn.get().getPunchTime(),
+                            lastPunchOut.get().getPunchTime()
+                    );
+                    totalActualHours = totalActualHours.plus(actualHours);
+                }
+            }
+            currentDate = currentDate.plusDays(1);
+        }
+
+        String formattedShiftHours = String.format("%02d:%02d",
+                totalShiftHours.toHours(),
+                totalShiftHours.toMinutesPart());
+
+        String formattedActualHours = String.format("%02d:%02d",
+                totalActualHours.toHours(),
+                totalActualHours.toMinutesPart());
+
+        return new WeeklyStatsResponse(startDate, endDate, formattedShiftHours, formattedActualHours);
+    }
 
 }
 

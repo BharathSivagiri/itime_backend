@@ -43,13 +43,13 @@ public class PunchController {
         return ResponseEntity.ok(timeResponse);
     }
 
-//    @GetMapping("/weekly-stats")
-//    public ResponseEntity<WeeklyStatsResponse> getWeeklyStats(
-//            @RequestParam Integer employeeId,
-//            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-//            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-//        WeeklyStatsResponse stats = punchService.calculateWeeklyStats(employeeId, startDate, endDate);
-//        return ResponseEntity.ok(stats);
-//    }
+    @GetMapping("/weekly-stats")
+    public ResponseEntity<WeeklyStatsResponse> getWeeklyStats(
+            @RequestParam Integer employeeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        WeeklyStatsResponse stats = punchService.calculateWeeklyStats(employeeId, startDate, endDate);
+        return ResponseEntity.ok(stats);
+    }
 }
 
