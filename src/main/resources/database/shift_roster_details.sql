@@ -1,9 +1,8 @@
 CREATE TABLE shift_roster_details (
     id int AUTO_INCREMENT PRIMARY KEY,
     emp_id INTEGER NOT NULL,
-    shift_id INTEGER NOT NULL,
+    shift_id INTEGER NULL,
     shift_date DATE NOT NULL,
-    shift_status VARCHAR(50) NOT NULL,
     created_dt DATE NOT NULL,
     created_by VARCHAR(50) NOT NULL,
     record_status VARCHAR(50) NOT NULL,
@@ -13,8 +12,10 @@ CREATE TABLE shift_roster_details (
     FOREIGN KEY (shift_id) REFERENCES shift_details(id)
 );
 
-INSERT INTO shift_roster_details (emp_id, shift_id, shift_date, shift_status, created_dt, created_by, record_status, updated_dt, updated_by) 
-VALUES (1, 3, '2024-11-27', 'SCHEDULED', '2024-11-27', 'Admin', 'ACTIVE', '2024-11-27', 'Admin');
+INSERT INTO shift_roster_details (emp_id, shift_id, shift_date, created_dt, created_by, record_status, updated_dt, updated_by) 
+VALUES (1, 3, '2024-11-27', '2024-11-27', 'Admin', 'ACTIVE', '2024-11-27', 'Admin');
+
+ALTER TABLE shift_roster_details ADD day_type VARCHAR(50) NOT NULL;
 
 SELECT * FROM shift_roster_details;
 

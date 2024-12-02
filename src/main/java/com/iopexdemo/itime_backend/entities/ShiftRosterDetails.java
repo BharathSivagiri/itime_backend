@@ -1,7 +1,7 @@
 package com.iopexdemo.itime_backend.entities;
 
+import com.iopexdemo.itime_backend.enums.EnumDayType;
 import com.iopexdemo.itime_backend.enums.EnumRecordStatus;
-import com.iopexdemo.itime_backend.enums.EnumShiftStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -30,10 +30,6 @@ public class ShiftRosterDetails {
     @Column(name = "shift_date")
     private LocalDate shiftDate;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "shift_status")
-    private EnumShiftStatus shiftStatus;
-
     @Column(name = "created_dt")
     private LocalDate createdDate;
 
@@ -43,6 +39,10 @@ public class ShiftRosterDetails {
     @Enumerated(EnumType.STRING)
     @Column(name = "record_status")
     private EnumRecordStatus recordStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "day_type")
+    private EnumDayType dayType;
 
     @Column(name = "updated_dt")
     private LocalDate updatedDate;
