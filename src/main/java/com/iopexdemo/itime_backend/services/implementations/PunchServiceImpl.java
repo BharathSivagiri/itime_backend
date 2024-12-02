@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -48,79 +49,59 @@ public class PunchServiceImpl implements PunchService {
 
     @Override
     public TimeCalculationResponse calculateTime(Integer employeeId, LocalDateTime targetDateTime) {
-        // Set target time - use provided time or current time if null
         LocalDateTime currentDateTime = targetDateTime != null ? targetDateTime : LocalDateTime.now();
         LocalDate currentDate = currentDateTime.toLocalDate();
 
-        // Fetch current day's shift roster from database
-        ShiftRosterDetails currentRoster = shiftRosterDetailsRepository
+        // Get ALL punches for the day to determine last punch status
+        List<WebPunch> allDayPunches = webPunchRepository
+                .findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(
+                        employeeId,
+                        currentDate.atStartOfDay(),
+                        currentDate.plusDays(1).atStartOfDay()
+                );
+
+        // Get last punch status regardless of shift time
+        Optional<WebPunch> lastPunchStatus = allDayPunches.stream()
+                .reduce((first, second) -> second);
+
+        // Get current roster
+        ShiftRosterDetails activeRoster = shiftRosterDetailsRepository
                 .findByEmployeeIdAndShiftDateAndRecordStatus(employeeId, currentDate, EnumRecordStatus.ACTIVE)
                 .orElse(null);
 
-        // Fetch previous day's shift roster from database
-        ShiftRosterDetails previousRoster = shiftRosterDetailsRepository
-                .findByEmployeeIdAndShiftDateAndRecordStatus(employeeId, currentDate.minusDays(1), EnumRecordStatus.ACTIVE)
-                .orElse(null);
-
-        // Calculate current shift start time (ex 18:00 current day)
-        LocalDateTime currentShiftStart = currentRoster != null ?
-                currentRoster.getShiftDate().atTime(currentRoster.getShiftDetails().getStartTime()) : null;
-
-        // Calculate current shift end time (ex 07:00 next day)
-        LocalDateTime currentShiftEnd = currentRoster != null ?
-                currentRoster.getShiftDate().plusDays(1).atTime(currentRoster.getShiftDetails().getEndTime()) : null;
-
-        // Calculate previous shift end time (ex 07:00 current day)
-        LocalDateTime previousShiftEnd = previousRoster != null ?
-                previousRoster.getShiftDate().plusDays(1).atTime(previousRoster.getShiftDetails().getEndTime()) : null;
-
-        // Determine which roster is active based on target time
-        // If time is before previous shift end -> use previous roster
-        // If time is after current shift start -> use current roster
-        // Otherwise return null (time falls between shifts)
-        ShiftRosterDetails activeRoster = previousShiftEnd != null && currentDateTime.isBefore(previousShiftEnd) ?
-                previousRoster : (currentShiftStart != null && !currentDateTime.isBefore(currentShiftStart) ? currentRoster : null);
-
-        // Return empty response if no active roster found (time between shifts)
         if (activeRoster == null) {
-            return TimeCalculationResponse.builder().build();
+            return TimeCalculationResponse.builder()
+                    .lastPunch(String.valueOf(lastPunchStatus.map(WebPunch::getPunchType).orElse(null)))
+                    .build();
         }
 
-        // Get shift details and calculate query window
         ShiftDetails shift = activeRoster.getShiftDetails();
-        LocalDateTime queryStart = activeRoster.getShiftDate().atTime(shift.getStartTime());
-        LocalDateTime queryEnd = activeRoster.getShiftDate().plusDays(1).atTime(shift.getEndTime());
+        LocalDateTime shiftStart = activeRoster.getShiftDate().atTime(shift.getStartTime());
+        LocalDateTime shiftEnd = shift.getStartTime().isBefore(shift.getEndTime()) ?
+                activeRoster.getShiftDate().atTime(shift.getEndTime()) :
+                activeRoster.getShiftDate().plusDays(1).atTime(shift.getEndTime());
 
-        // Get all punches within shift window, ordered by time
-        List<WebPunch> punches = webPunchRepository
-                .findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(employeeId, queryStart, queryEnd);
+        // Get shift punches for calculations
+        List<WebPunch> shiftPunches = webPunchRepository
+                .findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(
+                        employeeId, shiftStart, shiftEnd);
 
-        // Validate punch sequence - first punch must be IN
-        Optional<WebPunch> firstPunch = punches.stream().findFirst();
-        if (firstPunch.isPresent() && !EnumPunchType.IN.equals(firstPunch.get().getPunchType())) {
-            return TimeCalculationResponse.builder().build();
-        }
-
-        // Get first IN punch of shift
-        Optional<WebPunch> firstPunchIn = punches.stream()
+        Optional<WebPunch> firstPunchIn = shiftPunches.stream()
                 .filter(p -> EnumPunchType.IN.equals(p.getPunchType()))
                 .findFirst();
 
-        // Get last OUT punch of shift
-        Optional<WebPunch> lastPunchOut = punches.stream()
+        Optional<WebPunch> lastPunchOut = shiftPunches.stream()
                 .filter(p -> EnumPunchType.OUT.equals(p.getPunchType()))
                 .reduce((first, second) -> second);
 
-        // Calculate total hours if both IN and OUT punches exist
         Duration totalHours = (firstPunchIn.isPresent() && lastPunchOut.isPresent()) ?
                 Duration.between(firstPunchIn.get().getPunchTime(), lastPunchOut.get().getPunchTime()) : Duration.ZERO;
 
-        // Map all calculated data to response object
         return punchMapper.toTimeCalculationResponse(
                 firstPunchIn,
                 lastPunchOut,
                 totalHours,
-                punches.stream().reduce((first, second) -> second),
+                lastPunchStatus,
                 shift);
     }
 

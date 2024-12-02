@@ -32,7 +32,6 @@ public class PunchValidator {
         return employeeRepository.findByIdAndEmpStatus(employeeId, EnumEmployeeStatus.ACTIVE)
                 .orElseThrow(() -> new CustomException(AppMessages.EMPLOYEE_NOT_FOUND));
     }
-
     public void validateShiftAndPunchLimit(Integer employeeId, EnumPunchType punchType) {
         LocalDateTime currentTime = LocalDateTime.now();
 
@@ -68,19 +67,17 @@ public class PunchValidator {
             shiftEnd = roster.getShiftDate().plusDays(1).atTime(shift.getEndTime());
         }
 
-        // Validate if current time is within shift hours
-        if (currentTime.isBefore(shiftStart) || currentTime.isAfter(shiftEnd)) {
-            throw new CustomException(AppMessages.TIME_OUTSIDE_SHIFT);
-        }
+        // Only apply punch limit validation if within shift hours
+        if (currentTime.isAfter(shiftStart) && currentTime.isBefore(shiftEnd)) {
+            List<WebPunch> shiftPunches = webPunchRepository
+                    .findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(
+                            employeeId, shiftStart, shiftEnd);
 
-        // Punch limit validation
-        List<WebPunch> shiftPunches = webPunchRepository
-                .findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(
-                        employeeId, shiftStart, shiftEnd);
-
-        if (shiftPunches.size() >= dailyPunchLimit) {
-            throw new CustomException(AppMessages.PUNCH_LIMIT_EXCEEDED);
+            if (shiftPunches.size() >= dailyPunchLimit) {
+                throw new CustomException(AppMessages.PUNCH_LIMIT_EXCEEDED);
+            }
         }
+        // Outside shift hours - punch is allowed without limit validation
     }
 
 }
