@@ -13,6 +13,7 @@ import com.iopexdemo.itime_backend.repositories.ShiftRosterDetailsRepository;
 import com.iopexdemo.itime_backend.repositories.WebPunchRepository;
 import com.iopexdemo.itime_backend.utilities.constants.AppMessages;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -22,13 +23,20 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class PunchValidator {
-    private final ShiftRosterDetailsRepository shiftRosterRepository;
-    private final WebPunchRepository webPunchRepository;
+
+    @Autowired
+    EmployeeRepository employeeRepository;
+
+    @Autowired
+    ShiftRosterDetailsRepository shiftRosterRepository;
+
+    @Autowired
+    WebPunchRepository webPunchRepository;
 
     @Value("${punch.limit.daily}")
-    private Integer dailyPunchLimit;
+    Integer dailyPunchLimit;
 
-    public EmployeeDetails getValidatedEmployee(Integer employeeId, EmployeeRepository employeeRepository) {
+    public EmployeeDetails getValidatedEmployee(Integer employeeId) {
         return employeeRepository.findByIdAndEmpStatus(employeeId, EnumEmployeeStatus.ACTIVE)
                 .orElseThrow(() -> new CustomException(AppMessages.EMPLOYEE_NOT_FOUND));
     }
