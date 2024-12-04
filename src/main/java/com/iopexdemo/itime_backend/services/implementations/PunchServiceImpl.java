@@ -13,7 +13,6 @@ import com.iopexdemo.itime_backend.repositories.ShiftRosterDetailsRepository;
 import com.iopexdemo.itime_backend.repositories.WebPunchRepository;
 import com.iopexdemo.itime_backend.services.PunchService;
 import com.iopexdemo.itime_backend.validators.PunchValidator;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +25,6 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 public class PunchServiceImpl implements PunchService {
 
     private static final Logger logger = LoggerFactory.getLogger(PunchServiceImpl.class);
@@ -94,6 +92,7 @@ public class PunchServiceImpl implements PunchService {
 
         for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
             ShiftRosterDetails roster = getRosterDetails(employeeId, date);
+            ShiftRosterDetails previousDayRoster = getRosterDetails(employeeId, date.minusDays(1));
 
             // Only calculate hours for valid punch days
             if (isValidPunchDay(roster)) {
@@ -102,6 +101,20 @@ public class PunchServiceImpl implements PunchService {
 
                 Duration actualHours = calculateActualHours(employeeId, roster);
                 totalActualHours = totalActualHours.plus(actualHours);
+            }
+
+            // Handle night shift spanning from days marked as REGULAR to WEEK_OFF / HOLIDAY
+            if (previousDayRoster != null && previousDayRoster.getShiftDetails() != null
+                && isNightShift(date.atStartOfDay(), previousDayRoster)) {
+                    Duration nightShiftHours = calculateActualHours(employeeId, previousDayRoster);
+                    totalActualHours = totalActualHours.plus(nightShiftHours);
+            }
+
+            // Calculate non-shift hours (for HOLIDAY/WEEK_OFF)
+            if (roster != null && (roster.getDayType() == EnumDayType.HOLIDAY
+                || roster.getDayType() == EnumDayType.WEEK_OFF)) {
+                Duration nonShiftHours = calculateNonShiftHours(employeeId, date);
+                totalActualHours = totalActualHours.plus(nonShiftHours);
             }
         }
 
@@ -229,5 +242,28 @@ public class PunchServiceImpl implements PunchService {
 
     private String formatDuration(Duration duration) {
         return String.format("%02d:%02d", duration.toHours(), duration.toMinutesPart());
+    }
+
+    private Duration calculateNonShiftHours(Integer employeeId, LocalDate date) {
+        LocalDateTime dayStart = date.atStartOfDay();
+        LocalDateTime dayEnd = date.plusDays(1).atStartOfDay();
+
+        List<WebPunch> punches = webPunchRepository.findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(employeeId, dayStart, dayEnd);
+
+
+        Duration totalDuration = Duration.ZERO;
+        WebPunch currentIn = null;
+
+        for (WebPunch punch : punches) {
+            if (punch.getPunchType() == EnumPunchType.IN) {
+                currentIn = punch;
+            } else if (punch.getPunchType() == EnumPunchType.OUT && currentIn != null) {
+                totalDuration = totalDuration.plus(
+                        Duration.between(currentIn.getPunchTime(), punch.getPunchTime())
+                );
+                currentIn = null;
+            }
+        }
+        return totalDuration;
     }
 }

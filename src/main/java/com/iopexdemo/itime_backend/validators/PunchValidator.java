@@ -12,7 +12,6 @@ import com.iopexdemo.itime_backend.repositories.EmployeeRepository;
 import com.iopexdemo.itime_backend.repositories.ShiftRosterDetailsRepository;
 import com.iopexdemo.itime_backend.repositories.WebPunchRepository;
 import com.iopexdemo.itime_backend.utilities.constants.AppMessages;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -21,7 +20,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
 public class PunchValidator {
 
     @Autowired
