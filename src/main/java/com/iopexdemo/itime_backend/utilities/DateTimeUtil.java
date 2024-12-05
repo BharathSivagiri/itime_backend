@@ -14,6 +14,10 @@ public final class DateTimeUtil {
         long seconds = duration.toSecondsPart();
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
+
+    public static String formatDurations(Duration duration) {
+        return String.format("%02d:%02d", duration.toHours(), duration.toMinutesPart());
+    }
 }
 
 
