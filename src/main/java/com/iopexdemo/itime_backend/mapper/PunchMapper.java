@@ -44,8 +44,8 @@ public class PunchMapper {
                 .punchOutTime(lastPunchOut.map(WebPunch::getPunchTime).orElse(null))
                 .totalWorkingHours(DateTimeUtil.formatDuration(totalHours))
                 .lastPunch(lastPunch.map(punch -> punch.getPunchType().toString()).orElse(null))
-                .shiftStartTime(shiftDetails.getStartTime())
-                .shiftEndTime(shiftDetails.getEndTime())
+                .shiftStartTime(String.valueOf(shiftDetails.getStartTime()))
+                .shiftEndTime(String.valueOf(shiftDetails.getEndTime()))
                 .build();
     }
 }

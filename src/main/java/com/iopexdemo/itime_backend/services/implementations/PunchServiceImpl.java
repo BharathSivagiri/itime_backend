@@ -21,8 +21,10 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Stream;
+
+import static com.iopexdemo.itime_backend.utilities.DateTimeUtil.formatDurations;
 
 @Service
 public class PunchServiceImpl implements PunchService {
@@ -44,18 +46,18 @@ public class PunchServiceImpl implements PunchService {
     @Override
     public void recordPunch(PunchRequest request) {
         logger.info("Validating employee and punch data...");
-        EmployeeDetails employee = punchValidator.getValidatedEmployee(request.getEmployeeId());
+        EmployeeDetails employee = punchValidator.getValidatedEmployee(Integer.valueOf(request.getEmployeeId()));
 
         // Get current roster and check for night shift
         LocalDate currentDate = LocalDate.now();
-        ShiftRosterDetails currentRoster = getRosterDetails(request.getEmployeeId(), currentDate);
-        ShiftRosterDetails previousDayRoster = getRosterDetails(request.getEmployeeId(), currentDate.minusDays(1));
+        ShiftRosterDetails currentRoster = getRosterDetails(Integer.valueOf(request.getEmployeeId()), currentDate);
+        ShiftRosterDetails previousDayRoster = getRosterDetails(Integer.valueOf(request.getEmployeeId()), currentDate.minusDays(1));
 
         boolean isNightShift = isNightShift(LocalDateTime.now(), previousDayRoster);
 
         // Validate punch based on day type and shift
         if (shouldApplyPunchLimit(currentRoster, isNightShift)) {
-            punchValidator.validateShiftAndPunchLimit(request.getEmployeeId(), request.getPunchType());
+            punchValidator.validateShiftAndPunchLimit(Integer.valueOf(request.getEmployeeId()), request.getPunchType());
         }
 
         WebPunch punch = punchMapper.toPunchEntity(request, employee);
@@ -79,7 +81,9 @@ public class PunchServiceImpl implements PunchService {
 
         // Check if it's a valid punch day
         if (!isValidPunchDay(currentRoster)) {
-            return buildBasicResponse(lastPunchStatus);
+            return TimeCalculationResponse.builder()
+                    .lastPunch(String.valueOf(lastPunchStatus.map(WebPunch::getPunchType).orElse(null)))
+                    .build();
         }
 
         return calculateShiftTime(employeeId, currentRoster, currentDateTime, lastPunchStatus);
@@ -87,39 +91,45 @@ public class PunchServiceImpl implements PunchService {
 
     @Override
     public WeeklyStatsResponse calculateWeeklyStats(Integer employeeId, LocalDate startDate, LocalDate endDate) {
-        Duration totalActualHours = Duration.ZERO;
-        Duration totalShiftHours = Duration.ZERO;
+        Map<String, Duration> initialTotals = new HashMap<>();
+        initialTotals.put("totalShiftHours", Duration.ZERO);
+        initialTotals.put("totalActualHours", Duration.ZERO);
 
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            ShiftRosterDetails roster = getRosterDetails(employeeId, date);
-            ShiftRosterDetails previousDayRoster = getRosterDetails(employeeId, date.minusDays(1));
+        Map<String, Duration> totals = Stream.iterate(startDate, date -> !date.isAfter(endDate), date -> date.plusDays(1))
+                .reduce(
+                        initialTotals,
+                        (acc, date) -> {
+                            ShiftRosterDetails roster = getRosterDetails(employeeId, date);
+                            ShiftRosterDetails previousDayRoster = getRosterDetails(employeeId, date.minusDays(1));
 
-            // Only calculate hours for valid punch days
-            if (isValidPunchDay(roster)) {
-                Duration shiftHours = calculateShiftDuration(roster);
-                totalShiftHours = totalShiftHours.plus(shiftHours);
+                            if (isValidPunchDay(roster)) {
+                                acc.merge("totalShiftHours", calculateShiftDuration(roster), Duration::plus);
+                                acc.merge("totalActualHours", calculateActualHours(employeeId, roster), Duration::plus);
+                            }
 
-                Duration actualHours = calculateActualHours(employeeId, roster);
-                totalActualHours = totalActualHours.plus(actualHours);
-            }
+                            if (previousDayRoster != null && previousDayRoster.getShiftDetails() != null
+                                    && isNightShift(date.atStartOfDay(), previousDayRoster)) {
+                                acc.merge("totalActualHours", calculateActualHours(employeeId, previousDayRoster), Duration::plus);
+                            }
 
-            // Handle night shift spanning from days marked as REGULAR to WEEK_OFF / HOLIDAY
-            if (previousDayRoster != null && previousDayRoster.getShiftDetails() != null
-                && isNightShift(date.atStartOfDay(), previousDayRoster)) {
-                    Duration nightShiftHours = calculateActualHours(employeeId, previousDayRoster);
-                    totalActualHours = totalActualHours.plus(nightShiftHours);
-            }
+                            if (roster != null && (roster.getDayType() == EnumDayType.HOLIDAY
+                                    || roster.getDayType() == EnumDayType.WEEK_OFF)) {
+                                acc.merge("totalActualHours", calculateNonShiftHours(employeeId, date), Duration::plus);
+                            }
 
-            // Calculate non-shift hours (for HOLIDAY/WEEK_OFF)
-            if (roster != null && (roster.getDayType() == EnumDayType.HOLIDAY
-                || roster.getDayType() == EnumDayType.WEEK_OFF)) {
-                Duration nonShiftHours = calculateNonShiftHours(employeeId, date);
-                totalActualHours = totalActualHours.plus(nonShiftHours);
-            }
-        }
+                            return acc;
+                        },
+                        (map1, map2) -> map1
+                );
 
-        return buildWeeklyStatsResponse(startDate, endDate, totalShiftHours, totalActualHours);
+        return new WeeklyStatsResponse(
+                startDate.toString(),
+                endDate.toString(),
+                formatDurations(totals.get("totalShiftHours")),
+                formatDurations(totals.get("totalActualHours"))
+        );
     }
+
 
     // Helper Methods
 
@@ -177,13 +187,15 @@ public class PunchServiceImpl implements PunchService {
         if(currentDateTime.isBefore(shiftStart)){
             return TimeCalculationResponse.builder()
                     .lastPunch(String.valueOf(lastPunchStatus.map(WebPunch::getPunchType).orElse(null)))
-                    .shiftStartTime(shift.getStartTime())
-                    .shiftEndTime(shift.getEndTime())
+                    .shiftStartTime(String.valueOf(shift.getStartTime()))
+                    .shiftEndTime(String.valueOf(shift.getEndTime()))
                     .build();
         }
 
         if (!isWithinShift(currentDateTime, shiftStart, shiftEnd)) {
-            return buildBasicResponse(lastPunchStatus);
+            return TimeCalculationResponse.builder()
+                    .lastPunch(String.valueOf(lastPunchStatus.map(WebPunch::getPunchType).orElse(null)))
+                    .build();
         }
 
         List<WebPunch> punches = webPunchRepository.findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(
@@ -225,45 +237,35 @@ public class PunchServiceImpl implements PunchService {
                 : Duration.ZERO;
     }
 
-    private TimeCalculationResponse buildBasicResponse(Optional<WebPunch> lastPunchStatus) {
-        return TimeCalculationResponse.builder()
-                .lastPunch(String.valueOf(lastPunchStatus.map(WebPunch::getPunchType).orElse(null)))
-                .build();
-    }
-
-    private WeeklyStatsResponse buildWeeklyStatsResponse(LocalDate startDate, LocalDate endDate,
-                                                         Duration totalShiftHours, Duration totalActualHours) {
-        return new WeeklyStatsResponse(
-                startDate, endDate,
-                formatDuration(totalShiftHours),
-                formatDuration(totalActualHours)
-        );
-    }
-
-    private String formatDuration(Duration duration) {
-        return String.format("%02d:%02d", duration.toHours(), duration.toMinutesPart());
-    }
-
     private Duration calculateNonShiftHours(Integer employeeId, LocalDate date) {
         LocalDateTime dayStart = date.atStartOfDay();
         LocalDateTime dayEnd = date.plusDays(1).atStartOfDay();
 
         List<WebPunch> punches = webPunchRepository.findByEmployeeIdAndPunchTimeBetweenOrderByPunchTimeAsc(employeeId, dayStart, dayEnd);
 
+        Map<String, Object> initialState = new HashMap<>();
+        initialState.put("duration", Duration.ZERO);
+        initialState.put("currentInPunch", null);
 
-        Duration totalDuration = Duration.ZERO;
-        WebPunch currentIn = null;
+        Map<String, Object> finalState = punches.stream()
+                .reduce(initialState,
+                        (state, currentPunch) -> {
+                            Duration totalDuration = (Duration) state.get("duration");
+                            WebPunch lastInPunch = (WebPunch) state.get("currentInPunch");
 
-        for (WebPunch punch : punches) {
-            if (punch.getPunchType() == EnumPunchType.IN) {
-                currentIn = punch;
-            } else if (punch.getPunchType() == EnumPunchType.OUT && currentIn != null) {
-                totalDuration = totalDuration.plus(
-                        Duration.between(currentIn.getPunchTime(), punch.getPunchTime())
+                            if (currentPunch.getPunchType() == EnumPunchType.IN) {
+                                state.put("currentInPunch", currentPunch);
+                            } else if (currentPunch.getPunchType() == EnumPunchType.OUT && lastInPunch != null) {
+                                Duration newDuration = totalDuration.plus(
+                                        Duration.between(lastInPunch.getPunchTime(), currentPunch.getPunchTime())
+                                );
+                                state.put("duration", newDuration);
+                                state.put("currentInPunch", null);
+                            }
+                            return state;
+                        },
+                        (state1, state2) -> state1
                 );
-                currentIn = null;
-            }
-        }
-        return totalDuration;
+        return (Duration) finalState.get("duration");
     }
 }

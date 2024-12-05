@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 @Builder
 public class PunchRequest {
-    private Integer employeeId;
+    private String employeeId;
     private EnumPunchType punchType;
 }
 

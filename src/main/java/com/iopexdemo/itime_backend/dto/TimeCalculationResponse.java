@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 @Data
 @Builder
@@ -18,7 +17,7 @@ public class TimeCalculationResponse {
 
     private String totalWorkingHours;
     private String lastPunch;
-    private LocalTime shiftStartTime;
-    private LocalTime shiftEndTime;
+    private String shiftStartTime;
+    private String shiftEndTime;
 }
 
