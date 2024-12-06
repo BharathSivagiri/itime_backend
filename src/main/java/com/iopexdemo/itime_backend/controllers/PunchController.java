@@ -5,6 +5,7 @@ import com.iopexdemo.itime_backend.dto.TimeCalculationResponse;
 import com.iopexdemo.itime_backend.dto.WeeklyStatsResponse;
 import com.iopexdemo.itime_backend.services.implementations.PunchServiceImpl;
 import com.iopexdemo.itime_backend.utilities.constants.AppMessages;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +26,7 @@ public class PunchController {
     PunchServiceImpl punchService;
 
     @PostMapping
-    public ResponseEntity<String> punch(@RequestBody PunchRequest request) {
+    public ResponseEntity<String> punch(@Valid @RequestBody PunchRequest request) {
         logger.info("Request for web punch incoming in controller.");
         punchService.recordPunch(request);
         logger.info("Punch details saved successfully in the database.");

@@ -53,6 +53,8 @@ CREATE TABLE shift_roster_details (
     FOREIGN KEY (shift_id) REFERENCES shift_details(id)
 );
 
+
+
 -- Insert default values
 INSERT INTO employee_details (emp_name, emp_code, created_by, created_dt, emp_status, updated_dt, updated_by)
 VALUES ('John Doe', 'EMP001', 'System', CURDATE(), 'ACTIVE', CURDATE(), 'System');
@@ -62,3 +64,12 @@ VALUES ('Day Shift', 'DAY', '09:00:00', '17:00:00', CURDATE(), 'Admin', 'ACTIVE'
 
 INSERT INTO shift_roster_details (emp_id, shift_id, shift_date, created_dt, created_by, record_status, updated_dt, updated_by)
 VALUES (1, 1, CURDATE(), CURDATE(), 'Admin', 'ACTIVE', CURDATE(), 'Admin');
+
+
+
+-- Altering table columns
+ALTER TABLE shift_roster_details ADD day_type VARCHAR(50) NOT NULL;
+
+ALTER TABLE employee_details
+ADD emp_mail varchar(100) NOT NULL,
+ADD emp_password varchar(255) NOT NULL;

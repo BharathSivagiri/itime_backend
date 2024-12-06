@@ -7,6 +7,8 @@ import com.iopexdemo.itime_backend.entities.WebPunch;
 import com.iopexdemo.itime_backend.enums.EnumEmployeeStatus;
 import com.iopexdemo.itime_backend.enums.EnumPunchType;
 import com.iopexdemo.itime_backend.enums.EnumRecordStatus;
+import com.iopexdemo.itime_backend.exceptions.custom.BasicValidationException;
+import com.iopexdemo.itime_backend.exceptions.custom.BusinessValidationException;
 import com.iopexdemo.itime_backend.exceptions.custom.CustomException;
 import com.iopexdemo.itime_backend.repositories.EmployeeRepository;
 import com.iopexdemo.itime_backend.repositories.ShiftRosterDetailsRepository;
@@ -56,7 +58,7 @@ public class PunchValidator {
                             employeeId,
                             currentTime.toLocalDate().minusDays(1),
                             EnumRecordStatus.ACTIVE
-                    ).orElseThrow(() -> new CustomException(AppMessages.SHIFT_NOT_ASSIGNED));
+                    ).orElseThrow(() -> new BusinessValidationException(AppMessages.SHIFT_NOT_ASSIGNED));
         }
 
         ShiftDetails shift = roster.getShiftDetails();
