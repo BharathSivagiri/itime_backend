@@ -44,23 +44,23 @@ public class PunchServiceImpl implements PunchService {
     ShiftRosterDetailsRepository shiftRosterDetailsRepository;
 
     @Override
-    public void recordPunch(PunchRequest request) {
+    public void recordPunch(PunchRequest requestID) {
         logger.info("Validating employee and punch data...");
-        EmployeeDetails employee = punchValidator.getValidatedEmployee(Integer.valueOf(request.getEmployeeId()));
+        EmployeeDetails employee = punchValidator.getValidatedEmployee(Integer.valueOf(requestID.getEmployeeId()));
 
         // Get current roster and check for night shift
         LocalDate currentDate = LocalDate.now();
-        ShiftRosterDetails currentRoster = getRosterDetails(Integer.valueOf(request.getEmployeeId()), currentDate);
-        ShiftRosterDetails previousDayRoster = getRosterDetails(Integer.valueOf(request.getEmployeeId()), currentDate.minusDays(1));
+        ShiftRosterDetails currentRoster = getRosterDetails(Integer.valueOf(requestID.getEmployeeId()), currentDate);
+        ShiftRosterDetails previousDayRoster = getRosterDetails(Integer.valueOf(requestID.getEmployeeId()), currentDate.minusDays(1));
 
         boolean isNightShift = isNightShift(LocalDateTime.now(), previousDayRoster);
 
         // Validate punch based on day type and shift
         if (shouldApplyPunchLimit(currentRoster, isNightShift)) {
-            punchValidator.validateShiftAndPunchLimit(Integer.valueOf(request.getEmployeeId()), EnumPunchType.valueOf(request.getPunchType()));
+            punchValidator.validateShiftAndPunchLimit(Integer.valueOf(requestID.getEmployeeId()), EnumPunchType.valueOf(requestID.getPunchType()));
         }
 
-        WebPunch punch = punchMapper.toPunchEntity(request, employee);
+        WebPunch punch = punchMapper.toPunchEntity(requestID, employee);
         webPunchRepository.save(punch);
         logger.info("Punch recorded successfully.");
     }

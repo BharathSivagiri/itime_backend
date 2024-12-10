@@ -27,9 +27,11 @@ public class PunchController {
     PunchServiceImpl punchService;
 
     @PostMapping
-    public ResponseEntity<String> punch(@Valid @RequestBody PunchRequest request) {
+    public ResponseEntity<String> punch(HttpServletRequest request,@Valid @RequestBody PunchRequest requestID) {
         logger.info("Request for web punch incoming in controller.");
-        punchService.recordPunch(request);
+        Integer employeeId = (Integer) request.getAttribute("employeeId");
+        requestID.setEmployeeId(employeeId.toString());
+        punchService.recordPunch(requestID);
         logger.info("Punch details saved successfully in the database.");
         return ResponseEntity.ok(AppMessages.SUCCESSFUL_MESSAGE);
     }
