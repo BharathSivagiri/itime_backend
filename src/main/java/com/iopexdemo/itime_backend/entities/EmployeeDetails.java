@@ -25,6 +25,12 @@ public class EmployeeDetails {
     @Column(name = "emp_code", nullable = false, length = 50)
     private String empCode;
 
+    @Column(name = "emp_mail", nullable = false, length = 100)
+    private String empMail;
+
+    @Column(name = "emp_password", nullable = false, length = 255)
+    private String empPassword;
+
     @Column(name = "created_by", nullable = false, length = 50)
     private String createdBy;
 

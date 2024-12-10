@@ -57,7 +57,7 @@ public class PunchServiceImpl implements PunchService {
 
         // Validate punch based on day type and shift
         if (shouldApplyPunchLimit(currentRoster, isNightShift)) {
-            punchValidator.validateShiftAndPunchLimit(Integer.valueOf(request.getEmployeeId()), request.getPunchType());
+            punchValidator.validateShiftAndPunchLimit(Integer.valueOf(request.getEmployeeId()), EnumPunchType.valueOf(request.getPunchType()));
         }
 
         WebPunch punch = punchMapper.toPunchEntity(request, employee);

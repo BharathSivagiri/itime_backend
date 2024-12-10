@@ -12,5 +12,9 @@ public interface EmployeeRepository extends JpaRepository<EmployeeDetails, Integ
 
     Optional<EmployeeDetails> findByIdAndEmpStatus(Integer id, EnumEmployeeStatus status);
 
+    Optional<EmployeeDetails> findByEmpMailAndEmpStatus(String empMail, EnumEmployeeStatus status);
+
+    Optional<EmployeeDetails> findByEmpMail(String empMail);
+
 }
 
