@@ -5,6 +5,7 @@ import com.iopexdemo.itime_backend.dto.TimeCalculationResponse;
 import com.iopexdemo.itime_backend.dto.WeeklyStatsResponse;
 import com.iopexdemo.itime_backend.services.implementations.PunchServiceImpl;
 import com.iopexdemo.itime_backend.utilities.constants.AppMessages;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,10 +34,11 @@ public class PunchController {
         return ResponseEntity.ok(AppMessages.SUCCESSFUL_MESSAGE);
     }
 
-    @GetMapping("/calculate/{employeeId}")
+    @GetMapping("/calculate")
     public ResponseEntity<TimeCalculationResponse> calculateTime(
-            @PathVariable Integer employeeId,
+            HttpServletRequest request,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime targetDateTime) {
+        Integer employeeId = (Integer) request.getAttribute("employeeId");
         logger.info("Time calculation for web punch data started.");
         logger.info("Time calculation completed.");
         return ResponseEntity.ok(punchService.calculateTime(employeeId, targetDateTime));
@@ -44,9 +46,10 @@ public class PunchController {
 
     @GetMapping("/weekly-stats")
     public ResponseEntity<WeeklyStatsResponse> getWeeklyStats(
-            @RequestParam Integer employeeId,
+            HttpServletRequest request,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        Integer employeeId = (Integer) request.getAttribute("employeeId");
         return ResponseEntity.ok(punchService.calculateWeeklyStats(employeeId, startDate, endDate));
     }
 }

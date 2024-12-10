@@ -1,5 +1,6 @@
 package com.iopexdemo.itime_backend.exceptions.global;
 
+import com.iopexdemo.itime_backend.exceptions.custom.AuthException;
 import com.iopexdemo.itime_backend.exceptions.custom.BasicValidationException;
 import com.iopexdemo.itime_backend.exceptions.custom.BusinessValidationException;
 import com.iopexdemo.itime_backend.exceptions.custom.CustomException;
@@ -17,16 +18,16 @@ import java.util.stream.Collectors;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
-        @ExceptionHandler(MethodArgumentNotValidException.class)
-        public ResponseEntity<String> handleValidationException(MethodArgumentNotValidException ex) {
-            Map<String, String> response = new HashMap<>();
-            String errorMessage = ex.getBindingResult().getFieldErrors().stream()
-                    .map(FieldError::getDefaultMessage)
-                    .collect(Collectors.joining(", "));
-            response.put("error", errorMessage);
-            response.put("status", "FAILED");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response.toString());
-        }
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<String> handleValidationException(MethodArgumentNotValidException ex) {
+        Map<String, String> response = new HashMap<>();
+        String errorMessage = ex.getBindingResult().getFieldErrors().stream()
+                .map(FieldError::getDefaultMessage)
+                .collect(Collectors.joining(", "));
+        response.put("error", errorMessage);
+        response.put("status", "FAILED");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response.toString());
+    }
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<String> handleCustomException(CustomException ex)
@@ -53,5 +54,10 @@ public class GlobalExceptionHandler {
         response.put("error", ex.getMessage());
         response.put("status", "FAILED");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response.toString());
+    }
+
+    @ExceptionHandler(AuthException.class)
+    public ResponseEntity<String> handleAuthException(AuthException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ex.getMessage());
     }
 }
